@@ -22,9 +22,10 @@ beyond the usual `vendor/bin/typo3 extension:setup`.
 ### Collapsible navigation blocks
 
 The Site Settings module's left-hand navigation gains collapsible parent
-blocks. Click the chevron in front of a parent label to fold/unfold its
-children. State is persisted in `localStorage` (key:
-`t3-settings-nav-collapsed`) so collapse choices survive reloads.
+blocks. **All blocks start collapsed by default.** Click the chevron in
+front of a parent label to fold/unfold its children. The set of expanded
+blocks is persisted in `localStorage` (key: `t3-settings-nav-expanded`) so
+your choices survive reloads.
 
 - Leaf items (no children, or whose only children are filtered out by the
   module's own search/visibility logic) show a faint bullet instead of the

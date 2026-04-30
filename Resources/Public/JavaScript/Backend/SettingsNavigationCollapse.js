@@ -2,9 +2,9 @@
 // Uses MutationObserver because the Lit editor re-renders its tree on
 // search/state changes, so any DOM mutation must reapply itself.
 
-const STORAGE_KEY = 't3-settings-nav-collapsed';
+const STORAGE_KEY = 't3-settings-nav-expanded';
 
-const loadCollapsed = () => {
+const loadExpanded = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return new Set(raw ? JSON.parse(raw) : []);
@@ -13,13 +13,13 @@ const loadCollapsed = () => {
   }
 };
 
-const saveCollapsed = (set) => {
+const saveExpanded = (set) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
   } catch { /* quota or disabled storage — silently ignore */ }
 };
 
-const collapsed = loadCollapsed();
+const expanded = loadExpanded();
 
 // The navigation <li>s carry no data-key, but the body
 // .settings-category-list[data-key] elements do. Both trees come from the
@@ -62,15 +62,15 @@ const ensureToggle = (li) => {
       li.dataset.collapsed = next ? 'true' : 'false';
       const key = li.dataset.key;
       if (key) {
-        if (next) collapsed.add(key);
-        else collapsed.delete(key);
-        saveCollapsed(collapsed);
+        if (next) expanded.delete(key);
+        else expanded.add(key);
+        saveExpanded(expanded);
       }
     });
   }
 
   const key = li.dataset.key;
-  if (key && collapsed.has(key) && li.dataset.collapsed !== 'true') {
+  if (key && !expanded.has(key) && li.dataset.collapsed !== 'true') {
     li.dataset.collapsed = 'true';
   }
 };
