@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace WapplerSystems\SiteSetsExtras\EventListener;
 
-use TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent;
+use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Core\Attribute\AsEventListener;
-use TYPO3\CMS\Core\Page\JavaScriptModuleInstruction;
-use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Http\ApplicationType;
+use TYPO3\CMS\Core\Page\Event\BeforeJavaScriptsRenderingEvent;
 
-final readonly class AddBackendAssets
+final class AddBackendAssets
 {
-    public function __construct(private PageRenderer $pageRenderer) {}
-
-    #[AsEventListener(event: AfterBackendPageRenderEvent::class)]
-    public function __invoke(): void
+    #[AsEventListener(event: BeforeJavaScriptsRenderingEvent::class)]
+    public function __invoke(BeforeJavaScriptsRenderingEvent $event): void
     {
-        $this->pageRenderer->getJavaScriptRenderer()->addJavaScriptModuleInstruction(
-            JavaScriptModuleInstruction::create(
-                '@wapplersystems/site-sets-extras/Backend/SettingsNavigationCollapse.js'
-            )
+        if ($event->isInline()) {
+            return;
+        }
+        $request = $GLOBALS['TYPO3_REQUEST'] ?? null;
+        if (!$request instanceof ServerRequestInterface
+            || !ApplicationType::fromRequest($request)->isBackend()
+        ) {
+            return;
+        }
+        $event->getAssetCollector()->addJavaScript(
+            'site_sets_extras_collapse',
+            'EXT:site_sets_extras/Resources/Public/JavaScript/Backend/SettingsNavigationCollapse.js',
+            ['type' => 'module']
         );
     }
 }

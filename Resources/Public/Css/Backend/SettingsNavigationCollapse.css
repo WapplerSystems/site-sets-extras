@@ -1,33 +1,41 @@
-.settings-navigation-item-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1em;
-  height: 1em;
-  flex: none;
+.settings-navigation li[data-collapsible="true"] > .settings-navigation-item
+  .settings-navigation-item-icon {
   cursor: pointer;
-  border-radius: 2px;
-  color: inherit;
-  transition: background-color .12s ease;
 }
 
-.settings-navigation-item-toggle:hover,
-.settings-navigation-item-toggle:focus-visible {
-  background-color: rgba(0, 0, 0, .08);
-  outline: none;
-}
-
-.settings-navigation-item-toggle svg {
-  display: block;
+.settings-navigation li[data-collapsible="true"] > .settings-navigation-item
+  .settings-navigation-item-icon
+  typo3-backend-icon[identifier="actions-chevron-end"] {
+  display: inline-block;
   transition: transform .15s ease;
 }
 
-.settings-navigation-item-toggle[aria-expanded="false"] svg {
-  transform: rotate(-90deg);
+.settings-navigation li[data-collapsible="true"]:not([data-collapsed="true"])
+  > .settings-navigation-item
+  .settings-navigation-item-icon
+  typo3-backend-icon[identifier="actions-chevron-end"] {
+  transform: rotate(90deg);
 }
 
 .settings-navigation li[data-collapsible="true"][data-collapsed="true"] > ul {
   display: none;
+}
+
+.settings-navigation li[data-collapsible="false"]
+  > .settings-navigation-item
+  > .settings-navigation-item-icon:has(typo3-backend-icon[identifier="actions-chevron-end"])
+  > typo3-backend-icon {
+  display: none;
+}
+
+.settings-navigation li[data-collapsible="false"]
+  > .settings-navigation-item
+  > .settings-navigation-item-icon:has(typo3-backend-icon[identifier="actions-chevron-end"])::before {
+  content: "•";
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  opacity: 0.5;
 }
 
 /* When the user is typing in the search field the JS sets data-search-active

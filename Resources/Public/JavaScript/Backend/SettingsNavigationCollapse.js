@@ -36,53 +36,43 @@ const stampDataKeys = (editor) => {
   }
 };
 
-const TOGGLE_SVG =
-  '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
-  '<path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" ' +
-  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-
 const ensureToggle = (li) => {
   const itemBtn = li.querySelector(':scope > .settings-navigation-item');
   const childUl = li.querySelector(':scope > ul');
-  if (!itemBtn || !childUl) return;
+  if (!itemBtn) return;
+
+  const hasVisibleChild = childUl
+    && Array.from(childUl.children).some(
+      c => c.tagName === 'LI' && !c.hasAttribute('hidden')
+    );
+  if (!hasVisibleChild) {
+    li.dataset.collapsible = 'false';
+    return;
+  }
 
   li.dataset.collapsible = 'true';
 
-  let toggle = itemBtn.querySelector(':scope > .settings-navigation-item-toggle');
-  if (!toggle) {
-    toggle = document.createElement('span');
-    toggle.className = 'settings-navigation-item-toggle';
-    toggle.setAttribute('role', 'button');
-    toggle.setAttribute('tabindex', '0');
-    toggle.setAttribute('aria-label', 'Toggle category');
-    toggle.innerHTML = TOGGLE_SVG;
-
-    const handle = (e) => {
+  const iconSpan = itemBtn.querySelector(':scope > .settings-navigation-item-icon');
+  if (iconSpan && !iconSpan._collapseBound) {
+    iconSpan._collapseBound = true;
+    iconSpan.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       const next = li.dataset.collapsed !== 'true';
       li.dataset.collapsed = next ? 'true' : 'false';
-      toggle.setAttribute('aria-expanded', String(!next));
       const key = li.dataset.key;
       if (key) {
         if (next) collapsed.add(key);
         else collapsed.delete(key);
         saveCollapsed(collapsed);
       }
-    };
-    toggle.addEventListener('click', handle);
-    toggle.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') handle(e);
     });
-
-    itemBtn.insertBefore(toggle, itemBtn.firstChild);
   }
 
   const key = li.dataset.key;
   if (key && collapsed.has(key) && li.dataset.collapsed !== 'true') {
     li.dataset.collapsed = 'true';
   }
-  toggle.setAttribute('aria-expanded', String(li.dataset.collapsed !== 'true'));
 };
 
 const updateSearchState = (editor) => {
