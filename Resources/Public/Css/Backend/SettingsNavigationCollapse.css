@@ -1,0 +1,39 @@
+.settings-navigation-item-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  cursor: pointer;
+  border-radius: 2px;
+  color: inherit;
+  transition: background-color .12s ease;
+}
+
+.settings-navigation-item-toggle:hover,
+.settings-navigation-item-toggle:focus-visible {
+  background-color: rgba(0, 0, 0, .08);
+  outline: none;
+}
+
+.settings-navigation-item-toggle svg {
+  display: block;
+  transition: transform .15s ease;
+}
+
+.settings-navigation-item-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.settings-navigation li[data-collapsible="true"][data-collapsed="true"] > ul {
+  display: none;
+}
+
+/* When the user is typing in the search field the JS sets data-search-active
+   on the editor; reveal all nested lists so matches inside collapsed blocks
+   stay visible. The persisted state is untouched. */
+typo3-backend-settings-editor[data-search-active="true"]
+  .settings-navigation li[data-collapsible="true"][data-collapsed="true"] > ul {
+  display: revert;
+}

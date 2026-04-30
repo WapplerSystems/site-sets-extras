@@ -1,0 +1,31 @@
+{
+    "name": "wapplersystems/site-sets-extras",
+    "type": "typo3-cms-extension",
+    "description": "Quality-of-life UX improvements for the TYPO3 v13 backend Site Settings / Site Sets area.",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Sven Wappler",
+            "email": "info@wappler.systems"
+        },
+        {
+            "name": "Ilja Melnicenko",
+            "email": "melnicenko@wappler.systems"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "typo3/cms-core": "^13",
+        "typo3/cms-backend": "^13"
+    },
+    "autoload": {
+        "psr-4": {
+            "WapplerSystems\\SiteSetsExtras\\": "Classes/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "site_sets_extras"
+        }
+    }
+}
