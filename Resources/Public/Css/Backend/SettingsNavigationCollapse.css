@@ -1,6 +1,21 @@
 .settings-navigation li[data-collapsible="true"] > .settings-navigation-item
   .settings-navigation-item-icon {
   cursor: pointer;
+  position: relative;
+}
+
+/* Extend the chevron hit area without enlarging the chevron itself.
+   Pseudo-element clicks register on the host span, so the existing
+   iconSpan click listener keeps working unchanged. Asymmetric inset:
+   label sits to the right of the chevron, so extend tightly on the
+   right (-2px) to avoid stealing the first label character, generously
+   to the left (-8px) into the row's indent area where nothing else is
+   clickable. */
+.settings-navigation li[data-collapsible="true"] > .settings-navigation-item
+  .settings-navigation-item-icon::before {
+  content: '';
+  position: absolute;
+  inset: -6px -2px -6px -8px;
 }
 
 .settings-navigation li[data-collapsible="true"] > .settings-navigation-item
@@ -44,4 +59,63 @@
 typo3-backend-settings-editor[data-search-active="true"]
   .settings-navigation li[data-collapsible="true"][data-collapsed="true"] > ul {
   display: revert;
+}
+
+/* Active-path reveal: when a descendant is the currently active category,
+   the ancestor chain is visually expanded regardless of stored state. Same
+   non-destructive override pattern as the search reveal — the user's
+   persisted collapse choice is not modified. data-active-revealed drives
+   the actual reveal; data-active-ancestor (set on every chain member,
+   even ones the user has explicitly collapsed) drives the highlight. */
+.settings-navigation li[data-active-revealed="true"][data-collapsible="true"][data-collapsed="true"] > ul {
+  display: revert;
+}
+
+.settings-navigation li[data-active-revealed="true"][data-collapsible="true"]
+  > .settings-navigation-item
+  .settings-navigation-item-icon
+  typo3-backend-icon[identifier="actions-chevron-end"] {
+  transform: rotate(90deg);
+}
+
+/* Mirror core's active fill on ancestors of the active leaf, but skip the
+   outline so the leaf itself remains the visually distinct destination.
+   Survives explicit collapse — the parent stays in the active path even
+   when the user chose to hide its children. */
+.settings-navigation li[data-active-ancestor="true"]
+  > .settings-navigation-item:not(.active) {
+  background-color: var(--typo3-component-focus-bg);
+  color: var(--typo3-component-focus-color);
+}
+
+/* .settings-search is a flex row by default — let it wrap so our toolbar
+   (appended as the last child by JS) drops onto a new line below the
+   search input rather than sitting beside it. */
+typo3-backend-settings-editor .settings-search {
+  flex-wrap: wrap;
+}
+
+/* Bulk expand/collapse toolbar, inserted by JS as the last child of
+   .settings-search so it sits directly under the search input.
+   flex-basis:100% wraps it onto its own row inside the flex
+   .settings-search container; the buttons themselves hug their content
+   (left-aligned, not stretched to full width).
+   Uses TYPO3's btn classes for theme inheritance. */
+.settings-extras-bulk-toolbar {
+  flex-basis: 100%;
+  display: flex;
+  gap: var(--typo3-spacing-2, .5rem);
+}
+
+.settings-extras-bulk-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--typo3-spacing-2, .5rem);
+}
+
+.settings-extras-bulk-toolbar__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

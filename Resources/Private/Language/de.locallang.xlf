@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2">
+	<file source-language="en" target-language="de" datatype="plaintext" original="EXT:site_sets_extras/Resources/Private/Language/locallang.xlf" date="2026-05-06T00:00:00Z" product-name="site_sets_extras">
+		<header/>
+		<body>
+			<trans-unit id="siteSetsExtras.nav.expand_all" approved="yes">
+				<source>Expand all</source>
+				<target>Alle ausklappen</target>
+			</trans-unit>
+			<trans-unit id="siteSetsExtras.nav.collapse_all" approved="yes">
+				<source>Collapse all</source>
+				<target>Alle einklappen</target>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>
