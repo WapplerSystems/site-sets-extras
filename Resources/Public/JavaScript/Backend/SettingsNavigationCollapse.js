@@ -33,6 +33,17 @@ const loadExpandedSet = (siteId) => {
 const expandedFor = (editor) => {
   if (editor._expandedSet) return editor._expandedSet;
   const siteId = getSiteId(editor);
+  if (!siteId) {
+    // Persistence silently fails without a siteId (loadExpandedSet returns
+    // empty, persistExpanded no-ops). Warn once per editor so future
+    // debugging starts with a breadcrumb in the console rather than from
+    // scratch. Cached on `_expandedSet` below means we won't re-warn.
+    console.warn(
+      '[site_sets_extras] Could not resolve site identifier from editor action-url; ' +
+      'collapse/expand state will not persist for this session.',
+      { editor }
+    );
+  }
   editor._expandedSiteId = siteId;
   editor._expandedSet = loadExpandedSet(siteId);
   return editor._expandedSet;
@@ -50,14 +61,31 @@ const persistExpanded = (editor) => {
 // Drop keys from the editor's set that are no longer present in the nav,
 // so localStorage doesn't accumulate dead keys as configs evolve. Per-site
 // scoping makes this safe — keys from other sites are in their own bucket.
+//
+// The MutationObserver can fire mid-Lit-rerender, when stampDataKeys may
+// have only stamped a prefix of the LIs (it zips by index up to
+// min(nav, body)). Pruning against a partial tree would silently delete
+// legitimately-persisted keys. So three guards must all pass before we
+// trust the present set: nav has rendered, both trees have the same
+// length (no partial sync), and every nav LI carries a stamped key.
 const pruneStaleKeys = (editor) => {
   const expanded = expandedFor(editor);
   if (expanded.size === 0) return;
+
+  const navLis = editor.querySelectorAll('.settings-navigation li');
+  const bodyCats = editor.querySelectorAll(
+    '.settings-body-inner .settings-category-list[data-key]'
+  );
   const present = new Set();
-  editor.querySelectorAll('.settings-navigation li[data-key]').forEach(li => {
+  navLis.forEach(li => {
     if (li.dataset.key) present.add(li.dataset.key);
   });
-  if (present.size === 0) return;  // nav not yet stamped; skip this pass
+  if (navLis.length === 0
+    || navLis.length !== bodyCats.length
+    || present.size !== navLis.length) {
+    return;
+  }
+
   let changed = false;
   for (const key of expanded) {
     if (!present.has(key)) { expanded.delete(key); changed = true; }
@@ -65,11 +93,13 @@ const pruneStaleKeys = (editor) => {
   if (changed) persistExpanded(editor);
 };
 
-// Session-only: keys the user explicitly closed while their active leaf
-// was still inside. Without this, markActivePath would re-reveal them on
-// the next observer fire. Self-clears in markActivePath when the active
-// leaf moves out of the suppressed branch.
-const suppressedAncestors = new Set();
+// Session-only per-editor: keys the user explicitly closed while their
+// active leaf was still inside. Without this, markActivePath would
+// re-reveal them on the next observer fire. Self-clears in markActivePath
+// when the active leaf moves out of the suppressed branch. Per-editor
+// (not module-level) because two editors with overlapping data-key
+// namespaces would otherwise suppress each other's branches.
+const suppressedFor = (editor) => (editor._suppressedAncestors ??= new Set());
 
 // The navigation <li>s carry no data-key, but the body
 // .settings-category-list[data-key] elements do. Both trees come from the
@@ -86,6 +116,18 @@ const stampDataKeys = (editor) => {
   }
 };
 
+// Single source of truth for the aria-expanded value: visual state =
+// stored "open" OR a live active-path reveal. Used by setBranchOpen
+// (synchronous after click/key), ensureToggle (per-render mount), and
+// the bulk expand/collapse helpers.
+const updateAria = (li) => {
+  const itemBtn = li.querySelector(':scope > .settings-navigation-item');
+  if (!itemBtn) return;
+  const visiblyOpen = li.dataset.collapsed !== 'true'
+    || li.dataset.activeRevealed === 'true';
+  itemBtn.setAttribute('aria-expanded', visiblyOpen ? 'true' : 'false');
+};
+
 // Toggle the visible state, not the stored state — otherwise an
 // active-path reveal would make clicks/keys flip storage with no visual
 // effect. activeRevealed reflects "currently revealed via active path".
@@ -93,22 +135,28 @@ const setBranchOpen = (li, wantOpen) => {
   const wasRevealed = li.dataset.activeRevealed === 'true';
   li.dataset.collapsed = wantOpen ? 'false' : 'true';
   const key = li.dataset.key;
-  if (!key) return;
-  const editor = li.closest('typo3-backend-settings-editor');
-  if (editor) {
-    const expanded = expandedFor(editor);
-    if (wantOpen) expanded.add(key);
-    else expanded.delete(key);
-    persistExpanded(editor);
+  if (key) {
+    const editor = li.closest('typo3-backend-settings-editor');
+    if (editor) {
+      const expanded = expandedFor(editor);
+      if (wantOpen) expanded.add(key);
+      else expanded.delete(key);
+      persistExpanded(editor);
+    }
+    const suppressed = editor ? suppressedFor(editor) : null;
+    if (wasRevealed && !wantOpen) {
+      // Drop only the reveal flag for instant collapse; keep activeAncestor
+      // so the parent stays highlighted as part of the active path.
+      if (suppressed) suppressed.add(key);
+      delete li.dataset.activeRevealed;
+    } else if (wantOpen) {
+      if (suppressed) suppressed.delete(key);
+    }
   }
-  if (wasRevealed && !wantOpen) {
-    // Drop only the reveal flag for instant collapse; keep activeAncestor
-    // so the parent stays highlighted as part of the active path.
-    suppressedAncestors.add(key);
-    delete li.dataset.activeRevealed;
-  } else if (wantOpen) {
-    suppressedAncestors.delete(key);
-  }
+  // Mirror visual state to aria-expanded synchronously so AT announcements
+  // right after a click read the new state, rather than waiting for the
+  // next observer-driven enhance pass.
+  updateAria(li);
 };
 
 const ensureToggle = (li) => {
@@ -147,10 +195,7 @@ const ensureToggle = (li) => {
     li.dataset.collapsed = 'true';
   }
 
-  // aria-expanded mirrors visual state, including active-path reveals.
-  const visiblyOpen = li.dataset.collapsed !== 'true'
-    || li.dataset.activeRevealed === 'true';
-  itemBtn.setAttribute('aria-expanded', visiblyOpen ? 'true' : 'false');
+  updateAria(li);
 };
 
 const updateSearchState = (editor) => {
@@ -196,11 +241,13 @@ const fixBottomActive = (editor) => {
   }
 };
 
-// Set briefly during a nav-item click so the patched scrollTo (below)
-// rewrites Lit's smooth scroll to an instant jump. Without this, the
-// smooth scroll fires the IntersectionObserver repeatedly along the
-// way and we'd see a wave of branches reveal as it passes through.
-let forceInstantScroll = false;
+// `scrollable._forceInstantScroll` is set briefly during a nav-item click
+// so the patched scrollTo (below) rewrites Lit's smooth scroll to an
+// instant jump. Without it, smooth scroll fires the IntersectionObserver
+// repeatedly along the way and we'd see a wave of branches reveal as it
+// passes through. Stored on the scrollable element (not module-level)
+// because the scrollTo patch lives there and multiple editors could
+// share — or each have their own — scrollable parent.
 
 const bindScroll = (editor) => {
   if (editor._collapseScrollBound) return;
@@ -213,7 +260,7 @@ const bindScroll = (editor) => {
     scrollable._collapseScrollPatched = true;
     const original = scrollable.scrollTo.bind(scrollable);
     scrollable.scrollTo = (opts, ...rest) => {
-      if (forceInstantScroll && opts && typeof opts === 'object' && opts.behavior === 'smooth') {
+      if (scrollable._forceInstantScroll && opts && typeof opts === 'object' && opts.behavior === 'smooth') {
         return original({ ...opts, behavior: 'auto' });
       }
       return original(opts, ...rest);
@@ -257,10 +304,14 @@ document.addEventListener('click', (e) => {
   if (!(e.target instanceof Element)) return;
   const btn = e.target.closest('.settings-navigation-item');
   if (!btn) return;
-  forceInstantScroll = true;
-  setTimeout(() => { forceInstantScroll = false; }, 0);
 
   const editor = btn.closest('typo3-backend-settings-editor');
+  const scrollable = editor?._collapseScrollable;
+  if (scrollable) {
+    scrollable._forceInstantScroll = true;
+    setTimeout(() => { scrollable._forceInstantScroll = false; }, 0);
+  }
+
   const li = btn.closest('li');
   const key = li?.dataset.key;
   if (editor && key) {
@@ -323,8 +374,9 @@ const markActivePath = (editor) => {
     if (li.dataset.key) ancestorKeys.add(li.dataset.key);
     li = li.parentElement?.closest('li');
   }
-  for (const key of suppressedAncestors) {
-    if (!ancestorKeys.has(key)) suppressedAncestors.delete(key);
+  const suppressed = suppressedFor(editor);
+  for (const key of suppressed) {
+    if (!ancestorKeys.has(key)) suppressed.delete(key);
   }
 
   // Ancestors only — the active node's own subtree stays per stored state.
@@ -335,7 +387,7 @@ const markActivePath = (editor) => {
   li = activeLi.parentElement?.closest('li');
   while (li && navRoot.contains(li)) {
     li.dataset.activeAncestor = 'true';
-    if (!suppressedAncestors.has(li.dataset.key)) {
+    if (!suppressed.has(li.dataset.key)) {
       li.dataset.activeRevealed = 'true';
     }
     li = li.parentElement?.closest('li');
@@ -356,10 +408,14 @@ const expandAll = (editor) => {
   editor.querySelectorAll('.settings-navigation li[data-collapsible="true"]').forEach(li => {
     if (li.dataset.key) expanded.add(li.dataset.key);
     li.dataset.collapsed = 'false';
+    updateAria(li);
   });
-  suppressedAncestors.clear();
+  suppressedFor(editor).clear();
   persistExpanded(editor);
-  enhance(editor);
+  // Refresh active-path reveals (suppression cleared → every chain ancestor
+  // can re-acquire data-active-revealed). The full enhance pass is left to
+  // the rAF-coalesced observer; running it here would double-walk the LIs.
+  markActivePath(editor);
 };
 
 // Collapse-all: empties the persisted set, closes every branch, AND adds
@@ -372,18 +428,22 @@ const collapseAll = (editor) => {
   expanded.clear();
   editor.querySelectorAll('.settings-navigation li[data-collapsible="true"]').forEach(li => {
     li.dataset.collapsed = 'true';
+    updateAria(li);
   });
   const activeBtn = editor.querySelector('.settings-navigation-item.active');
   const navRoot = editor.querySelector('.settings-navigation');
   if (activeBtn && navRoot) {
+    const suppressed = suppressedFor(editor);
     let li = activeBtn.closest('li')?.parentElement?.closest('li');
     while (li && navRoot.contains(li)) {
-      if (li.dataset.key) suppressedAncestors.add(li.dataset.key);
+      if (li.dataset.key) suppressed.add(li.dataset.key);
       li = li.parentElement?.closest('li');
     }
   }
   persistExpanded(editor);
-  enhance(editor);
+  // Refresh active-path reveals against the new suppressed set. Full enhance
+  // pass deferred to the rAF-coalesced observer.
+  markActivePath(editor);
 };
 
 // Lit re-renders the editor's light DOM on state changes (search input,
@@ -405,9 +465,16 @@ const ensureCollapseAllToolbar = (editor) => {
     btn.className = 'btn btn-default btn-sm settings-extras-bulk-toolbar__btn';
     const label = labelFor(labelKey, fallbackLabel);
     btn.title = label;
-    btn.innerHTML =
-      `<typo3-backend-icon identifier="${iconId}" size="small"></typo3-backend-icon>` +
-      `<span class="settings-extras-bulk-toolbar__label">${label}</span>`;
+
+    const icon = document.createElement('typo3-backend-icon');
+    icon.setAttribute('identifier', iconId);
+    icon.setAttribute('size', 'small');
+
+    const span = document.createElement('span');
+    span.className = 'settings-extras-bulk-toolbar__label';
+    span.textContent = label;
+
+    btn.append(icon, span);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -451,7 +518,23 @@ const enhanceAll = () => {
 // Lit toggles the .active class on nav buttons in-place (no childList change),
 // so the observer must also see class-attribute mutations. We only ever write
 // dataset.* attributes, so this filter won't loop on our own writes.
-new MutationObserver(enhanceAll).observe(document.body, {
+//
+// Lit's re-render emits hundreds of mutations across multiple microtask ticks
+// (one keystroke in search ≈ 300+ callback invocations on a 100-LI tree).
+// Coalesce into one enhance per animation frame: rAF fires after the current
+// task settles, so we observe the final tree state instead of partial ones,
+// and we don't pay the per-mutation walk.
+let enhanceScheduled = false;
+const scheduleEnhance = () => {
+  if (enhanceScheduled) return;
+  enhanceScheduled = true;
+  requestAnimationFrame(() => {
+    enhanceScheduled = false;
+    enhanceAll();
+  });
+};
+
+new MutationObserver(scheduleEnhance).observe(document.body, {
   childList: true,
   subtree: true,
   attributes: true,
