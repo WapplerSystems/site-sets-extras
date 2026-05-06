@@ -4,6 +4,53 @@ All notable changes to this extension are documented in this file. The
 format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1]
+
+Maintenance release — bug fixes, robustness, and observer performance.
+No behavior changes for end users beyond the search input feeling
+snappier on large category trees.
+
+### Added
+- `LICENSE` file at the repo root with the canonical FSF GPL-2.0 text.
+  `composer.json` already declared `GPL-2.0-or-later`, but the actual
+  license text wasn't bundled — GitHub now displays the license and
+  strict OSS scanners stop flagging the package.
+
+### Fixed
+- Bulk toolbar buttons no longer interpolate translated labels into
+  `innerHTML`. Labels with `&`/`<`/quotes would have rendered broken
+  HTML; this also closes a footgun if a future label source becomes
+  less trusted.
+- `pruneStaleKeys` no longer deletes legitimately-persisted expand
+  keys when the MutationObserver fires mid-Lit-rerender on a partially
+  stamped tree. Three coherence guards now require a fully-stamped tree
+  before any pruning happens.
+- `setBranchOpen` updates `aria-expanded` synchronously on the toggled
+  button, instead of waiting for the next observer-driven enhance pass.
+  Closes a brief gap during which assistive tech could announce stale
+  state right after a click or keypress.
+- `suppressedAncestors` set and the smooth-scroll-rewriter flag are now
+  per-editor / per-scrollable rather than module-level. Prevents
+  cross-editor bleed if multiple `<typo3-backend-settings-editor>`
+  instances ever co-exist on a page.
+- `console.warn` once per editor if `getSiteId` returns null (previously
+  silent — preferences just stopped persisting with no breadcrumb in
+  the console).
+
+### Changed
+- MutationObserver fires now coalesce into a single `enhance` pass per
+  animation frame via `requestAnimationFrame`. One keystroke in the
+  search input used to trigger hundreds of enhance calls on a 100-LI
+  tree; now it triggers one.
+- `expandAll` / `collapseAll` no longer call the full `enhance(editor)`
+  pipeline at the end. They write `data-collapsed` and `aria-expanded`
+  inline and call `markActivePath` directly, saving one redundant LI
+  walk per click on large trees. The next rAF-coalesced observer pass
+  picks up the rest of the pipeline naturally.
+- Single `updateAria(li)` helper consolidates the `aria-expanded`
+  formula previously duplicated across `setBranchOpen`, `ensureToggle`,
+  and the bulk handlers.
+
 ## [0.3.0]
 
 ### Added
